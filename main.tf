@@ -5,30 +5,48 @@ provider "aws" {
 
 resource "aws_vpc" "target" {
   cidr_block = "10.0.0.0/24"
+  tags = {
+    Name = var.name[0]
+  }
 }
 
 resource "aws_vpc" "agent" {
   cidr_block = "10.100.100.0/24"
+  tags = {
+    Name = var.name[1]
+  }
 }
 
 resource "aws_subnet" "targetSubnet" {
   vpc_id                  = aws_vpc.target.id
   cidr_block              = "10.0.0.0/26"
   map_public_ip_on_launch = true
+  tags = {
+    Name = var.name[0]
+  }
 }
 
 resource "aws_subnet" "agentSubnet" {
   vpc_id                  = aws_vpc.agent.id
   cidr_block              = "10.100.100.0/26"
   map_public_ip_on_launch = true
+  tags = {
+    Name = var.name[1]
+  }
 }
 
 resource "aws_internet_gateway" "targetIGW" {
   vpc_id = aws_vpc.target.id
+  tags = {
+    Name = var.name[0]
+  }
 }
 
 resource "aws_internet_gateway" "agentIGW" {
   vpc_id = aws_vpc.agent.id
+  tags = {
+    Name = var.name[1]
+  }
 }
 
 resource "aws_route" "targetInetAccess" {
@@ -53,22 +71,28 @@ resource "aws_security_group" "agentEndpointSG" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"] # In [] because it's a list
   }
+  tags = {
+    Name = var.name[1]
+  }
 }
 
 resource "aws_security_group" "targetAmiSG" {
-  name = "targetAmiSG"
+  name   = "targetAmiSG"
   vpc_id = aws_vpc.target.id
 
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["82.68.125.46/32", aws_subnet.agentSubnet.cidr_block]
+    cidr_blocks = ["82.68.125.46/32", aws_subnet.agentSubnet.cidr_block, aws_subnet.targetSubnet.cidr_block]
+  }
+  tags = {
+    Name = var.name[0]
   }
 }
 
 resource "aws_security_group" "agentAmiSG" {
-  name = "agentAmiSG"
+  name   = "agentAmiSG"
   vpc_id = aws_vpc.agent.id
 
   ingress {
@@ -76,6 +100,9 @@ resource "aws_security_group" "agentAmiSG" {
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = ["82.68.125.46/32"]
+  }
+  tags = {
+    Name = var.name[1]
   }
 }
 
@@ -110,7 +137,7 @@ resource "aws_vpc_endpoint" "agentEndpoint" {
   service_name       = aws_vpc_endpoint_service.targetEndpoint.service_name
   vpc_endpoint_type  = "Interface"
   security_group_ids = [aws_security_group.agentEndpointSG.id]
-  subnet_ids          = [aws_subnet.agentSubnet.id]
+  subnet_ids         = [aws_subnet.agentSubnet.id]
 
 }
 
@@ -125,7 +152,9 @@ resource "aws_instance" "targetEC2" {
   subnet_id       = aws_subnet.targetSubnet.id
   security_groups = [aws_security_group.targetAmiSG.id]
   key_name        = aws_key_pair.chrisKey.id
-
+  tags = {
+    Name = var.name[0]
+  }
 }
 
 resource "aws_instance" "agentEC2" {
@@ -134,4 +163,7 @@ resource "aws_instance" "agentEC2" {
   subnet_id       = aws_subnet.agentSubnet.id
   security_groups = [aws_security_group.agentAmiSG.id]
   key_name        = aws_key_pair.chrisKey.id
+  tags = {
+    Name = var.name[1]
+  }
 }
