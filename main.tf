@@ -106,30 +106,40 @@ resource "aws_security_group" "agentAmiSG" {
   }
 }
 
-resource "aws_elb" "privateLinkNLB" {
-  name     = "privateLinkNLB"
-  internal = true
-  subnets  = [aws_subnet.targetSubnet.id]
+resource "aws_lb" "privateLinkNLB" {
+  name               = "privateLinkNLB"
+  internal           = true
+  load_balancer_type = "network"
+  subnets            = [aws_subnet.targetSubnet.id]
+}
 
-  listener {
-    instance_port     = 22
-    instance_protocol = "tcp"
-    lb_port           = 22
-    lb_protocol       = "tcp"
-  }
+resource "aws_lb_target_group" "targetTG" {
+  name     = "targetTG"
+  port     = 22
+  protocol = "TCP"
+  vpc_id   = aws_vpc.target.id
   health_check {
     healthy_threshold   = 2
     unhealthy_threshold = 2
     timeout             = 3
-    target              = "TCP:22"
+    port                = 22
     interval            = 30
   }
-  instances = [aws_instance.targetEC2.id]
+}
+
+resource "aws_lb_listener" "privateLinkNLB" {
+  load_balancer_arn = "aws_lb_privateLinkNLB.arn"
+  port              = "22"
+  protocol          = "TCP"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.targetTG.arn
+  }
 }
 
 resource "aws_vpc_endpoint_service" "targetEndpoint" {
   acceptance_required        = false
-  network_load_balancer_arns = [aws_elb.privateLinkNLB.arn]
+  network_load_balancer_arns = [aws_lb.privateLinkNLB.arn]
 }
 
 resource "aws_vpc_endpoint" "agentEndpoint" {
@@ -147,22 +157,22 @@ resource "aws_key_pair" "chrisKey" {
 }
 
 resource "aws_instance" "targetEC2" {
-  ami             = "ami-0271d331ac7dab654"
-  instance_type   = "t2.micro"
-  subnet_id       = aws_subnet.targetSubnet.id
-  security_groups = [aws_security_group.targetAmiSG.id]
-  key_name        = aws_key_pair.chrisKey.id
+  ami                    = "ami-0271d331ac7dab654"
+  instance_type          = "t2.micro"
+  subnet_id              = aws_subnet.targetSubnet.id
+  vpc_security_group_ids = [aws_security_group.targetAmiSG.id]
+  key_name               = aws_key_pair.chrisKey.id
   tags = {
     Name = var.name[0]
   }
 }
 
 resource "aws_instance" "agentEC2" {
-  ami             = "ami-0271d331ac7dab654"
-  instance_type   = "t2.micro"
-  subnet_id       = aws_subnet.agentSubnet.id
-  security_groups = [aws_security_group.agentAmiSG.id]
-  key_name        = aws_key_pair.chrisKey.id
+  ami                    = "ami-0271d331ac7dab654"
+  instance_type          = "t2.micro"
+  subnet_id              = aws_subnet.agentSubnet.id
+  vpc_security_group_ids = [aws_security_group.agentAmiSG.id]
+  key_name               = aws_key_pair.chrisKey.id
   tags = {
     Name = var.name[1]
   }
