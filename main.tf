@@ -11,7 +11,7 @@ resource "aws_vpc" "target" {
 }
 
 resource "aws_vpc" "agent" {
-  cidr_block = "10.100.100.0/24"
+  cidr_block           = "10.100.100.0/24"
   tags = {
     Name = var.name[1]
   }
@@ -21,6 +21,7 @@ resource "aws_subnet" "targetSubnet" {
   vpc_id                  = aws_vpc.target.id
   cidr_block              = "10.0.0.0/26"
   map_public_ip_on_launch = true
+  availability_zone       = "eu-west-2a"
   tags = {
     Name = var.name[0]
   }
@@ -30,7 +31,7 @@ resource "aws_subnet" "agentSubnet" {
   vpc_id                  = aws_vpc.agent.id
   cidr_block              = "10.100.100.0/26"
   map_public_ip_on_launch = true
-  availability_zone = "eu-west-2a" # Required as Interface endpoint not supported in AZ1 and AZ3
+  availability_zone       = "eu-west-2a" # Required as Interface endpoint not supported in AZ1 and AZ3
   tags = {
     Name = var.name[1]
   }
@@ -70,7 +71,7 @@ resource "aws_security_group" "agentEndpointSG" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # In [] because it's a list
+    cidr_blocks = [aws_subnet.agentSubnet.cidr_block] # In [] because it's a list
   }
   tags = {
     Name = var.name[1]
@@ -120,9 +121,15 @@ resource "aws_lb_target_group" "targetTG" {
   protocol = "TCP"
   vpc_id   = aws_vpc.target.id
   health_check {
-    port                = 22
+    port     = 22
     protocol = "TCP"
   }
+}
+
+resource "aws_lb_target_group_attachment" "targetAttach" {
+  target_group_arn = aws_lb_target_group.targetTG.arn
+  target_id        = aws_instance.targetEC2.id
+  port             = 22
 }
 
 resource "aws_lb_listener" "privateLinkNLB" {
@@ -141,12 +148,11 @@ resource "aws_vpc_endpoint_service" "targetEndpoint" {
 }
 
 resource "aws_vpc_endpoint" "agentEndpoint" {
-  vpc_id             = aws_vpc.agent.id
-  service_name       = aws_vpc_endpoint_service.targetEndpoint.service_name
-  vpc_endpoint_type  = "Interface"
-  security_group_ids = [aws_security_group.agentEndpointSG.id]
-  subnet_ids         = [aws_subnet.agentSubnet.id]
-
+  vpc_id              = aws_vpc.agent.id
+  service_name        = aws_vpc_endpoint_service.targetEndpoint.service_name
+  vpc_endpoint_type   = "Interface"
+  security_group_ids  = [aws_security_group.agentEndpointSG.id]
+  subnet_ids          = [aws_subnet.agentSubnet.id]
 }
 
 resource "aws_key_pair" "chrisKey" {
