@@ -30,6 +30,7 @@ resource "aws_subnet" "agentSubnet" {
   vpc_id                  = aws_vpc.agent.id
   cidr_block              = "10.100.100.0/26"
   map_public_ip_on_launch = true
+  availability_zone = "eu-west-2a" # Required as Interface endpoint not supported in AZ1 and AZ3
   tags = {
     Name = var.name[1]
   }
