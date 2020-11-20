@@ -73,6 +73,7 @@ resource "aws_security_group" "agentEndpointSG" {
     protocol    = "tcp"
     cidr_blocks = [aws_subnet.agentSubnet.cidr_block] # In [] because it's a list
   }
+
   tags = {
     Name = var.name[1]
   }
@@ -103,6 +104,14 @@ resource "aws_security_group" "agentAmiSG" {
     protocol    = "tcp"
     cidr_blocks = ["82.68.125.46/32"]
   }
+
+    egress {
+    from_port = 0
+    to_port = 65535
+    protocol = "tcp"
+    cidr_blocks = [aws_subnet.agentSubnet.cidr_block]
+  }
+  
   tags = {
     Name = var.name[1]
   }
